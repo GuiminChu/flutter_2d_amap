@@ -20,7 +20,9 @@ public class AMap2DDelegate implements PluginRegistry.RequestPermissionsResultLi
     private final String[] permission = {
         Manifest.permission.ACCESS_COARSE_LOCATION,
         Manifest.permission.ACCESS_FINE_LOCATION,
-        Manifest.permission.READ_PHONE_STATE
+        Manifest.permission.READ_PHONE_STATE,
+        Manifest.permission.WRITE_EXTERNAL_STORAGE,
+        Manifest.permission.READ_EXTERNAL_STORAGE,
     };
     
     interface PermissionManager {
@@ -36,7 +38,7 @@ public class AMap2DDelegate implements PluginRegistry.RequestPermissionsResultLi
         void askForPermission();
     }
 
-    interface RequestPermission {
+    public interface RequestPermission {
         /**
          * 权限请求成功
          */
@@ -51,7 +53,7 @@ public class AMap2DDelegate implements PluginRegistry.RequestPermissionsResultLi
     
     private final PermissionManager permissionManager;
     
-    AMap2DDelegate(final Activity activity){
+    AMap2DDelegate(final Activity activity) {
         
         permissionManager = new PermissionManager() {
             @Override
@@ -71,31 +73,31 @@ public class AMap2DDelegate implements PluginRegistry.RequestPermissionsResultLi
         };
     }
 
-    void requestPermissions(@NonNull RequestPermission mRequestPermission){
+    public void requestPermissions(@NonNull RequestPermission mRequestPermission) {
         this.mRequestPermission = mRequestPermission;
         if (!permissionManager.isPermissionGranted()) {
             permissionManager.askForPermission();
-        }else {
+        } else {
             mRequestPermission.onRequestPermissionSuccess();
         }
     }
 
     @Override
     public boolean onRequestPermissionsResult(int requestCode, String[] strings, int[] ints) {
-        if (requestCode == REQUEST_PERMISSION){
+        if (requestCode == REQUEST_PERMISSION) {
             boolean permissionGranted = true;
             for (int i : ints) {
                 if (i != PackageManager.PERMISSION_GRANTED) {
                     permissionGranted = false;
                 }
             }
-            if (permissionGranted){
-                mRequestPermission.onRequestPermissionSuccess();
-            }else {
-                mRequestPermission.onRequestPermissionFailure();
+            if (permissionGranted) {
+                if(this.mRequestPermission != null) this.mRequestPermission.onRequestPermissionSuccess();
+            } else {
+                if(this.mRequestPermission != null) this.mRequestPermission.onRequestPermissionFailure();
             }
             return true;
-        }else {
+        } else {
             return false;
         }
     }

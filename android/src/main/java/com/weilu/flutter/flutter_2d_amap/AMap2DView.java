@@ -32,9 +32,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import androidx.annotation.NonNull;
+import io.flutter.plugin.common.BinaryMessenger;
 import io.flutter.plugin.common.MethodCall;
 import io.flutter.plugin.common.MethodChannel;
-import io.flutter.plugin.common.PluginRegistry;
 import io.flutter.plugin.platform.PlatformView;
 
 /**
@@ -59,38 +60,45 @@ public class AMap2DView implements PlatformView, MethodChannel.MethodCallHandler
     private final Context context;
     private String keyWord = "";
     private boolean isPoiSearch;
+    private static final String IS_POI_SEARCH = "isPoiSearch";
     
-    AMap2DView(final Context context, PluginRegistry.Registrar registrar, int id, Map<String, Object> params, AMap2DDelegate delegate) {
+    AMap2DView(final Context context, BinaryMessenger messenger, int id, Map<String, Object> params, AMap2DDelegate delegate) {
         this.context = context;
         platformThreadHandler = new Handler(context.getMainLooper());
         createMap(context);
-        delegate.requestPermissions(new AMap2DDelegate.RequestPermission() {
-            @Override
-            public void onRequestPermissionSuccess() {
-                setUpMap();
-            }
-
-            @Override
-            public void onRequestPermissionFailure() {
-                Toast.makeText(context,"定位失败，请检查定位权限是否开启！", Toast.LENGTH_SHORT).show();
-            }
-        });
+        setAMap2DDelegate(delegate);
         mAMap2DView.onResume();
-        methodChannel = new MethodChannel(registrar.messenger(), "plugins.weilu/flutter_2d_amap_" + id);
+        methodChannel = new MethodChannel(messenger, "plugins.weilu/flutter_2d_amap_" + id);
         methodChannel.setMethodCallHandler(this);
 
-        if (params.containsKey("isPoiSearch")) {
-            isPoiSearch = (boolean) params.get("isPoiSearch");
+        if (params.containsKey(IS_POI_SEARCH)) {
+            isPoiSearch = (boolean) params.get(IS_POI_SEARCH);
         }
     }
     
-    private void createMap(Context context){
+    void setAMap2DDelegate(AMap2DDelegate delegate) {
+        if (delegate != null){
+            delegate.requestPermissions(new AMap2DDelegate.RequestPermission() {
+                @Override
+                public void onRequestPermissionSuccess() {
+                    setUpMap();
+                }
+
+                @Override
+                public void onRequestPermissionFailure() {
+                    Toast.makeText(context,"定位失败，请检查定位权限是否开启！", Toast.LENGTH_SHORT).show();
+                }
+            });
+        }
+    }
+    
+    private void createMap(Context context) {
         mAMap2DView = new MapView(context);
         mAMap2DView.onCreate(new Bundle());
         aMap = mAMap2DView.getMap();
     }
     
-    private void setUpMap(){
+    private void setUpMap() {
         CameraUpdateFactory.zoomTo(32);
         aMap.setOnMapClickListener(this);
         // 设置定位监听
@@ -110,19 +118,35 @@ public class AMap2DView implements PlatformView, MethodChannel.MethodCallHandler
     }
     
     @Override
-    public void onMethodCall(MethodCall methodCall, MethodChannel.Result result) {
+    public void onMethodCall(MethodCall methodCall, @NonNull MethodChannel.Result result) {
         String method = methodCall.method;
         Map<String, Object> request = (Map<String, Object>) methodCall.arguments;
-        switch(method){
+        switch(method) {
             case "search":
                 keyWord = (String) request.get("keyWord");
                 search();
                 break;
             case "move":
-                move(Double.parseDouble((String) request.get("lat")), Double.parseDouble((String) request.get("lon")));
+                move(toDouble((String) request.get("lat")), toDouble((String) request.get("lon")));
                 break;
+            case "location":
+                if (mLocationClient != null) {
+                    mLocationClient.startLocation();
+                }
+                break;
+            default:
+                break;    
         }
-    };
+    }
+
+    private double toDouble(String obj) {
+        try {
+            return Double.parseDouble(obj);
+        } catch (Exception e) {
+            e.fillInStackTrace();
+        }
+        return 0D;
+    }
     
     @Override
     public View getView() {
@@ -157,7 +181,7 @@ public class AMap2DView implements PlatformView, MethodChannel.MethodCallHandler
     }
 
     private void search() {
-        if (!isPoiSearch){
+        if (!isPoiSearch) {
             return;
         }
         query = new PoiSearch.Query(keyWord, SEARCH_CONTENT, "");
@@ -169,14 +193,13 @@ public class AMap2DView implements PlatformView, MethodChannel.MethodCallHandler
         poiSearch.searchPOIAsyn();
     }
 
-    private void move(double lat, double lon){
-        aMap.moveCamera(CameraUpdateFactory.zoomTo(16));
+    private void move(double lat, double lon) {
         LatLng latLng = new LatLng(lat, lon);
         drawMarkers(latLng, BitmapDescriptorFactory.defaultMarker());
     }
 
     private void search(double latitude, double longitude) {
-        if (!isPoiSearch){
+        if (!isPoiSearch) {
             return;
         }
         query = new PoiSearch.Query("", SEARCH_CONTENT, "");
@@ -201,9 +224,9 @@ public class AMap2DView implements PlatformView, MethodChannel.MethodCallHandler
     
     private void drawMarkers(LatLng latLng, BitmapDescriptor bitmapDescriptor) {
         aMap.animateCamera(CameraUpdateFactory.changeLatLng(new LatLng(latLng.latitude, latLng.longitude)));
-        if (mMarker == null){
+        if (mMarker == null) {
             mMarker = aMap.addMarker(new MarkerOptions().position(latLng).icon(bitmapDescriptor).draggable(true));
-        }else {
+        } else {
             mMarker.setPosition(latLng);
         }
     }
@@ -259,7 +282,7 @@ public class AMap2DView implements PlatformView, MethodChannel.MethodCallHandler
                         builder.append("\"latitude\": \"");builder.append(item.getLatLonPoint().getLatitude());builder.append("\",");
                         builder.append("\"longitude\": \"");builder.append(item.getLatLonPoint().getLongitude());builder.append("\"");
                         builder.append("},");
-                        if (i == list.size() - 1){
+                        if (i == list.size() - 1) {
                             builder.deleteCharAt(builder.length() - 1);
                         }
                     }
@@ -277,7 +300,7 @@ public class AMap2DView implements PlatformView, MethodChannel.MethodCallHandler
                     } else {
                         platformThreadHandler.post(postMessageRunnable);
                     }
-                    if (list.size() > 0){
+                    if (list.size() > 0) {
                         move(list.get(0).getLatLonPoint().getLatitude(), list.get(0).getLatLonPoint().getLongitude());
                     }
                 }

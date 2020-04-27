@@ -1,3 +1,19 @@
+## 0.0.3
+
+* 点击地图选点时，去除地图缩放。
+* 更新Android依赖至最新：
+
+```groovy
+    api 'com.amap.api:map2d:6.0.0'
+    api 'com.amap.api:search:7.1.0'
+    api 'com.amap.api:location:4.8.0'
+```
+
+## 0.0.2
+
+* 支持Flutter 1.12版本新的android插件api
+* Android权限申请优化
+
 ## 0.0.1
 
 * 处理地图所需权限申请
